@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include <stdlib.h>
 #include <vector>
+#include <random>
 
 using namespace std;
 
@@ -27,20 +28,31 @@ void printWalks(long** walks, int numNodes, int walkPerNode, int walkLength) {
     }
 }
 
-long findNextNode(unordered_map<long, unordered_set<long>> neighbours, long curNode, long prevNode) {
-    unordered_set<long> curNeighbours = neighbours[curNode];
+long findNextNode(unordered_map<long, unordered_set<long>> neighbours, long curNode, long prevNode, double p, double q) {
+    default_random_engine generator;
+    vector<long> curNeighbours;
+    curNeighbours.insert(curNeighbours.end(), neighbours[curNode].begin(), neighbours[curNode].end());
     if (prevNode == -1) {
-        unordered_set<long>::iterator itr = curNeighbours.begin();
-        int incur = rand() % curNeighbours.size();
-        advance(itr, incur);
-        return *itr;
+        return curNeighbours[rand() % curNeighbours.size()];
     } else {
         unordered_set<long> prevNeighbours = neighbours[prevNode];
-
+        vector<double> weights(curNeighbours.size());
+        for (int i = 0; i < weights.size(); i++) {
+            long nextNode = curNeighbours[i];
+            if (nextNode == prevNode) {
+                weights[i] = 1.0 / p;
+            } else if (prevNeighbours.find(nextNode) != prevNeighbours.end()) {
+                weights[i] = 1.0;
+            } else {
+                weights[i] = 1.0 / q;
+            }
+        }
+        discrete_distribution<int> dist(weights.begin(), weights.end());
+        return curNeighbours[dist(generator)];
     }
 }
 
-long** generateWalks(unordered_map<long, unordered_set<long>> neighbours, int walkPerNode, int walkLength) {
+long** generateWalks(unordered_map<long, unordered_set<long>> neighbours, int walkPerNode, int walkLength, double p, double q) {
     long** walks = new long*[walkPerNode * neighbours.size()];
     int counter = 0;
     for (auto& neighbour : neighbours) {
@@ -51,7 +63,7 @@ long** generateWalks(unordered_map<long, unordered_set<long>> neighbours, int wa
             int curNode = node;
             int prevNode = -1;
             for (int j = 1; j < walkLength; j++) {
-                int nextNode = findNextNode(neighbours, curNode, prevNode);
+                int nextNode = findNextNode(neighbours, curNode, prevNode, p, q);
                 walks[counter + i][j] = nextNode;
                 prevNode = curNode;
                 curNode = nextNode;
@@ -66,6 +78,8 @@ int main(int argc, char* argv[]) {
     string fileName;
     int walkPerNode = 1;
     int walkLength = 10;
+    double p = 1;
+    double q = 2;
 
     if (argc == 2) {
         fileName = argv[1];
@@ -99,7 +113,7 @@ int main(int argc, char* argv[]) {
         neighbours[e].insert(s);
     }
 
-    long** walks = generateWalks(neighbours, walkPerNode, walkLength);
+    long** walks = generateWalks(neighbours, walkPerNode, walkLength, p, q);
     printWalks(walks, neighbours.size(), walkPerNode, walkLength);
     // clean up
     for (int i = 0; i < walkPerNode * neighbours.size(); i++) {
